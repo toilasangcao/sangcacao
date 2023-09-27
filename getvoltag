@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Ensure the AWS CLI is configured with the appropriate credentials and region
+# aws configure
+
+# Initialize the output file
+echo "Vol ID,Name,Classify,Service,ServiceId,Environment" > voltag.csv
+
+# Read each line from vol_list.txt
+while IFS= read -r vol_id; do
+    # Get the EC2 instance ID to which the volume is attached
+    instance_id=$(aws ec2 describe-volumes --volume-ids "$vol_id" --query 'Volumes[0].Attachments[0].InstanceId' --output text)
+
+    if [ -n "$instance_id" ]; then
+        # Get the tags of the associated EC2 instance
+        tags=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$instance_id")
+
+        # Extract the required tags
+        name=$(echo "$tags" | jq -r '.Tags[] | select(.Key=="Name") | .Value')
+        classify=$(echo "$tags" | jq -r '.Tags[] | select(.Key=="Classify") | .Value')
+        service=$(echo "$tags" | jq -r '.Tags[] | select(.Key=="Service") | .Value')
+        service_id=$(echo "$tags" | jq -r '.Tags[] | select(.Key=="ServiceId") | .Value')
+        environment=$(echo "$tags" | jq -r '.Tags[] | select(.Key=="Environment") | .Value')
+
+        # Write the result to voltag.csv
+        echo "$vol_id,$name,$classify,$service,$service_id,$environment" >> voltag.csv
+    fi
+done < vol_list.txt
+
+echo "Script executed successfully. Results saved in voltag.csv."
